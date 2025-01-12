@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import router, { useRouter } from 'next/router';
 import Link from 'next/link';
 import { Lock } from 'lucide-react';
 import { TextStream } from '@/components/ui/text-stream';
@@ -27,6 +28,7 @@ export default function LoginPage() {
         title: "Success",
         description: "You have been logged in successfully.",
       });
+      router.push('/dashboard'); // Redirect to the dashboard page
     } catch (error: any) {
       toast({
         title: "Error",

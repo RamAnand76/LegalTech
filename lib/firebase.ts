@@ -7,8 +7,10 @@ const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: "G-LR6LF5MYQ8"
 };
+//console.log(firebaseConfig.apiKey);
 
 // Initialize Firebase only if it hasn't been initialized
 let app;
