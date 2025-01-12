@@ -7,6 +7,8 @@ import { TextStream } from '@/components/ui/text-stream';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/components/auth/auth-card';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -15,10 +17,39 @@ export default function SignupPage() {
     password: '',
     confirmPassword: '',
   });
+  const [loading, setLoading] = useState(false);
+  const { signup } = useAuth();
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle signup logic here
+    
+    if (formData.password !== formData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      await signup(formData.email, formData.password);
+      toast({
+        title: "Success",
+        description: "Account created successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,6 +73,7 @@ export default function SignupPage() {
             value={formData.name}
             onChange={handleChange}
             className="w-full"
+            disabled={loading}
           />
         </div>
         <div>
@@ -52,6 +84,7 @@ export default function SignupPage() {
             value={formData.email}
             onChange={handleChange}
             className="w-full"
+            disabled={loading}
           />
         </div>
         <div>
@@ -62,6 +95,7 @@ export default function SignupPage() {
             value={formData.password}
             onChange={handleChange}
             className="w-full"
+            disabled={loading}
           />
         </div>
         <div>
@@ -72,11 +106,12 @@ export default function SignupPage() {
             value={formData.confirmPassword}
             onChange={handleChange}
             className="w-full"
+            disabled={loading}
           />
         </div>
-        <Button type="submit" className="w-full">
+        <Button type="submit" className="w-full" disabled={loading}>
           <UserPlus className="mr-2 h-4 w-4" />
-          Create Account
+          {loading ? 'Creating account...' : 'Create Account'}
         </Button>
       </form>
 
