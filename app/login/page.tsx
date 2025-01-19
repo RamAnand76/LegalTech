@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import router, { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Lock } from 'lucide-react';
 import { TextStream } from '@/components/ui/text-stream';
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,11 +29,12 @@ export default function LoginPage() {
         title: "Success",
         description: "You have been logged in successfully.",
       });
-      router.push('/dashboard'); // Redirect to the dashboard page
+      router.push('/dashboard');
     } catch (error: any) {
+      console.error('Login error:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to login. Please check your credentials.",
         variant: "destructive",
       });
     } finally {
@@ -54,6 +56,7 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full"
             disabled={loading}
+            required
           />
         </div>
         <div>
@@ -64,6 +67,7 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full"
             disabled={loading}
+            required
           />
         </div>
         <Button type="submit" className="w-full" disabled={loading}>

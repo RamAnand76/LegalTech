@@ -18,37 +18,50 @@ export function useAuth() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+      if (user) {
+        setUser(user);
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => unsubscribe();
   }, []);
 
   const signup = async (email: string, password: string) => {
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      setUser(userCredential.user);
+      return userCredential.user;
     } catch (error: any) {
-      throw new Error(error.message);
+      console.error('Signup error:', error);
+      throw new Error(error.message || 'Failed to create account');
     }
   };
 
   const login = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      setUser(userCredential.user);
+      return userCredential.user;
     } catch (error: any) {
-      throw new Error(error.message);
+      console.error('Login error:', error);
+      if (error.code === 'auth/invalid-credential') {
+        throw new Error('Invalid email or password');
+      }
+      throw new Error(error.message || 'Failed to login');
     }
   };
 
   const logout = async () => {
     try {
       await signOut(auth);
+      setUser(null);
       router.push('/');
     } catch (error: any) {
-      throw new Error(error.message);
+      console.error('Logout error:', error);
+      throw new Error(error.message || 'Failed to logout');
     }
   };
 
