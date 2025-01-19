@@ -44,7 +44,7 @@ LegalTech Platform is an advanced legal technology platform providing contract r
 ### Running the Project
 To run the project locally, use the following command:
 ```bash
-npm run dev
+npm next dev
 ```
 or
 ```bash
@@ -82,7 +82,7 @@ We welcome contributions to enhance the LegalTech Platform. Please follow these 
 1. Fork the repository.
 2. Create a new branch (`git checkout -b feature-branch`).
 3. Make your changes.
-4. Commit your changes (`git commit -m 'Add new feature'`).
+4. Commit your changes (`git commit -m 'feat: Add new feature'`).
 5. Push to the branch (`git push origin feature-branch`).
 6. Open a Pull Request.
 
