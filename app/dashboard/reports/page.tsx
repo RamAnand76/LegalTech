@@ -23,29 +23,22 @@ import { Shield, Plus, AlertCircle, Search, Filter } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-
-interface Report {
-  id: string;
-  title: string;
-  content: string;
-  severity: 'High' | 'Medium' | 'Low';
-  status: 'Pending Review' | 'Under Investigation' | 'Resolved';
-  created_at: string;
-  user_id: string;
-}
+import { CorruptionReport, ReportSeverity, ReportStatus } from '@/lib/types/reports';
 
 export default function ReportsPage() {
   const { user } = useAuth();
-  const [reports, setReports] = useState<Report[]>([]);
+  const [reports, setReports] = useState<CorruptionReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [showNewReportModal, setShowNewReportModal] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<CorruptionReport | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [newReport, setNewReport] = useState({
     title: '',
     content: '',
-    severity: 'Medium' as 'Medium' | 'High' | 'Low',
+    severity: 'Medium' as ReportSeverity,
   });
 
   useEffect(() => {
@@ -100,6 +93,7 @@ export default function ReportsPage() {
 
       toast.success('Report submitted successfully');
       setNewReport({ title: '', content: '', severity: 'Medium' });
+      setShowNewReportModal(false);
       fetchReports();
     } catch (error: any) {
       toast.error('Failed to submit report');
@@ -107,60 +101,19 @@ export default function ReportsPage() {
     }
   };
 
+  const handleViewDetails = (report: CorruptionReport) => {
+    setSelectedReport(report);
+    setShowDetailsModal(true);
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Corruption Reporting</h1>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Report
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Submit New Report</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              <div>
-                <Input
-                  placeholder="Report Title"
-                  value={newReport.title}
-                  onChange={(e) => setNewReport({ ...newReport, title: e.target.value })}
-                />
-              </div>
-              <div>
-                <Textarea
-                  placeholder="Report Content"
-                  value={newReport.content}
-                  onChange={(e) => setNewReport({ ...newReport, content: e.target.value })}
-                  className="min-h-[150px]"
-                />
-              </div>
-              <div>
-                <Select
-                  value={newReport.severity}
-                  onValueChange={(value: 'High' | 'Medium' | 'Low') =>
-                    setNewReport({ ...newReport, severity: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Severity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="High">High</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="Low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button className="w-full" onClick={handleSubmitReport}>
-                Submit Report
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setShowNewReportModal(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Report
+        </Button>
       </div>
 
       <Card className="p-6 mb-8">
@@ -234,51 +187,99 @@ export default function ReportsPage() {
                     {report.severity}
                   </span>
                   <span className="text-sm text-muted-foreground">{report.status}</span>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedReport(report)}
-                      >
-                        View Details
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
-                      <DialogHeader>
-                        <DialogTitle>Report Details</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 mt-4">
-                        <div>
-                          <h3 className="font-semibold text-lg">{report.title}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Filed on {new Date(report.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex space-x-4">
-                          <span className={`text-sm font-medium px-2 py-1 rounded-full ${
-                            report.severity === 'High' ? 'bg-red-100 text-red-800' :
-                            report.severity === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {report.severity}
-                          </span>
-                          <span className="text-sm font-medium px-2 py-1 rounded-full bg-secondary">
-                            {report.status}
-                          </span>
-                        </div>
-                        <div className="bg-muted p-4 rounded-lg">
-                          <p className="whitespace-pre-wrap">{report.content}</p>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewDetails(report)}
+                  >
+                    View Details
+                  </Button>
                 </div>
               </div>
             ))
           )}
         </div>
       </Card>
+
+      {/* New Report Modal */}
+      <Dialog open={showNewReportModal} onOpenChange={setShowNewReportModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Submit New Report</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Input
+                placeholder="Report Title"
+                value={newReport.title}
+                onChange={(e) => setNewReport({ ...newReport, title: e.target.value })}
+              />
+            </div>
+            <div>
+              <Textarea
+                placeholder="Report Content"
+                value={newReport.content}
+                onChange={(e) => setNewReport({ ...newReport, content: e.target.value })}
+                className="min-h-[150px]"
+              />
+            </div>
+            <div>
+              <Select
+                value={newReport.severity}
+                onValueChange={(value: ReportSeverity) =>
+                  setNewReport({ ...newReport, severity: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Severity" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={handleSubmitReport}>
+              Submit Report
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Details Modal */}
+      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Report Details</DialogTitle>
+          </DialogHeader>
+          {selectedReport && (
+            <div className="space-y-4 mt-4">
+              <div>
+                <h3 className="font-semibold text-lg">{selectedReport.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  Filed on {new Date(selectedReport.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex space-x-4">
+                <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                  selectedReport.severity === 'High' ? 'bg-red-100 text-red-800' :
+                  selectedReport.severity === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-green-100 text-green-800'
+                }`}>
+                  {selectedReport.severity}
+                </span>
+                <span className="text-sm font-medium px-2 py-1 rounded-full bg-secondary">
+                  {selectedReport.status}
+                </span>
+              </div>
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="whitespace-pre-wrap">{selectedReport.content}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Card className="p-6 bg-amber-50 border-amber-200">
         <div className="flex items-start space-x-4">
