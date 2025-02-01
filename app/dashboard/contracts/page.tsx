@@ -5,13 +5,19 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { FileText, Upload, Search, Filter, AlertCircle } from 'lucide-react';
+import { FileText, Upload, Search, Filter, Eye } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 import { Contract, ContractStatus } from '@/lib/types/contracts';
@@ -24,12 +30,15 @@ export default function ContractsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<ContractStatus | 'all'>('all');
   const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchContracts();
     }
-  }, [user]);
+  }, [user, statusFilter, searchQuery]); // Add dependencies to trigger fetch
 
   const fetchContracts = async () => {
     try {
@@ -69,9 +78,9 @@ export default function ContractsPage() {
       return;
     }
 
-    // Validate file size (7MB)
-    if (file.size > 7 * 1024 * 1024) {
-      toast.error('File size must be less than 7MB');
+    // Validate file size (6MB)
+    if (file.size > 6 * 1024 * 1024) {
+      toast.error('File size must be less than 6MB');
       return;
     }
 
@@ -107,6 +116,23 @@ export default function ContractsPage() {
       console.error('Error:', error);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handlePreview = async (contract: Contract) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('contracts')
+        .createSignedUrl(contract.file_path, 60); // URL valid for 60 seconds
+
+      if (error) throw error;
+
+      setPreviewUrl(data.signedUrl);
+      setSelectedContract(contract);
+      setShowPreview(true);
+    } catch (error: any) {
+      toast.error('Failed to load preview');
+      console.error('Error:', error);
     }
   };
 
@@ -161,19 +187,22 @@ export default function ContractsPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Contract Review</h1>
-        <Button disabled={uploading}>
-          <Upload className="mr-2 h-4 w-4" />
-          <label className="cursor-pointer">
-            {uploading ? 'Uploading...' : 'Upload Contract'}
-            <input
-              type="file"
-              className="hidden"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={handleFileUpload}
-              disabled={uploading}
-            />
-          </label>
-        </Button>
+        <div className="flex items-center gap-4">
+          <p className="text-sm text-muted-foreground">Max file size: 6MB</p>
+          <Button disabled={uploading}>
+            <Upload className="mr-2 h-4 w-4" />
+            <label className="cursor-pointer">
+              {uploading ? 'Uploading...' : 'Upload Contract'}
+              <input
+                type="file"
+                className="hidden"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
+            </label>
+          </Button>
+        </div>
       </div>
 
       <Card className="p-6 mb-8">
@@ -185,18 +214,12 @@ export default function ContractsPage() {
               placeholder="Search contracts..."
               className="pl-9"
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                fetchContracts();
-              }}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <Select
             value={statusFilter}
-            onValueChange={(value: ContractStatus | 'all') => {
-              setStatusFilter(value);
-              fetchContracts();
-            }}
+            onValueChange={(value: ContractStatus | 'all') => setStatusFilter(value)}
           >
             <SelectTrigger className="w-[180px]">
               <Filter className="mr-2 h-4 w-4" />
@@ -244,6 +267,13 @@ export default function ContractsPage() {
                     {contract.status.replace('_', ' ').charAt(0).toUpperCase() + contract.status.slice(1)}
                   </span>
                   <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handlePreview(contract)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
                     variant="outline"
                     size="sm"
                     disabled={contract.status !== 'pending'}
@@ -258,6 +288,23 @@ export default function ContractsPage() {
           )}
         </div>
       </Card>
+
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{selectedContract?.file_name}</DialogTitle>
+          </DialogHeader>
+          {previewUrl && (
+            <div className="flex-1 w-full h-full min-h-[60vh]">
+              <iframe
+                src={previewUrl}
+                className="w-full h-full rounded-md"
+                title="Contract Preview"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
