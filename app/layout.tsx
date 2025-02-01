@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Navigation } from '@/components/navigation';
+import { Toaster } from 'sonner';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
@@ -27,6 +28,7 @@ export default function RootLayout({
         >
           <Navigation />
           {children}
+          <Toaster richColors position="top-center" />
         </ThemeProvider>
       </body>
     </html>

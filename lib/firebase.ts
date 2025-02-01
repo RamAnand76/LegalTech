@@ -2,12 +2,12 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyBY29AI18KewuRzVFcB3JSwpZosBr857VU",
+  authDomain: "legaltech-a39bf.firebaseapp.com",
+  projectId: "legaltech-a39bf",
+  storageBucket: "legaltech-a39bf.firebasestorage.app",
+  messagingSenderId: "911760651836",
+  appId: "1:911760651836:web:4b50dfba03840260e9f539",
   measurementId: "G-LR6LF5MYQ8"
 };
 //console.log(firebaseConfig.apiKey);
