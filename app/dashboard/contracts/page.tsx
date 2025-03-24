@@ -17,11 +17,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { FileText, Upload, Search, Filter, Eye } from 'lucide-react';
+import { FileText, Upload, Search, Filter, Eye, Info } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 import { Contract, ContractStatus } from '@/lib/types/contracts';
 import { toast } from 'sonner';
+import { reviewDocument } from '@/lib/gemini';
+import ReactMarkdown from 'react-markdown';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { motion } from 'framer-motion';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Initialize PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 export default function ContractsPage() {
   const { user } = useAuth();
@@ -33,12 +41,15 @@ export default function ContractsPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  const [reviewContent, setReviewContent] = useState<string>('');
+  const [reviewing, setReviewing] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchContracts();
     }
-  }, [user, statusFilter, searchQuery]); // Add dependencies to trigger fetch
+  }, [user, statusFilter, searchQuery]);
 
   const fetchContracts = async () => {
     try {
@@ -71,14 +82,12 @@ export default function ContractsPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!allowedTypes.includes(file.type)) {
       toast.error('Invalid file type. Please upload PDF, JPG, or PNG files only.');
       return;
     }
 
-    // Validate file size (6MB)
     if (file.size > 6 * 1024 * 1024) {
       toast.error('File size must be less than 6MB');
       return;
@@ -86,7 +95,6 @@ export default function ContractsPage() {
 
     setUploading(true);
     try {
-      // Upload file to Supabase Storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `${user?.id}/${fileName}`;
@@ -97,7 +105,6 @@ export default function ContractsPage() {
 
       if (uploadError) throw uploadError;
 
-      // Create contract record
       const { error: dbError } = await supabase.from('contracts').insert({
         user_id: user?.id,
         file_name: file.name,
@@ -123,7 +130,7 @@ export default function ContractsPage() {
     try {
       const { data, error } = await supabase.storage
         .from('contracts')
-        .createSignedUrl(contract.file_path, 60); // URL valid for 60 seconds
+        .createSignedUrl(contract.file_path, 60);
 
       if (error) throw error;
 
@@ -136,50 +143,74 @@ export default function ContractsPage() {
     }
   };
 
-  const handleReview = async (contractId: string) => {
+  const extractPdfText = async (url: string): Promise<string> => {
     try {
-      const { error } = await supabase
+      const pdf = await pdfjsLib.getDocument(url).promise;
+      let fullText = '';
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        fullText += pageText + '\n\n';
+      }
+      
+      return fullText;
+    } catch (error) {
+      console.error('Error extracting PDF text:', error);
+      throw new Error('Failed to extract text from PDF');
+    }
+  };
+
+  const handleReview = async (contract: Contract) => {
+    setReviewing(true);
+    setSelectedContract(contract);
+    setShowReview(true);
+
+    try {
+      const { data: urlData, error: urlError } = await supabase.storage
         .from('contracts')
-        .update({ status: 'in_review' })
-        .eq('id', contractId);
+        .createSignedUrl(contract.file_path, 60);
 
-      if (error) throw error;
+      if (urlError) throw urlError;
 
-      // Simulate review process
-      setTimeout(async () => {
-        try {
-          // Update contract status
-          const { error: updateError } = await supabase
-            .from('contracts')
-            .update({ status: 'completed' })
-            .eq('id', contractId);
+      let content = '';
 
-          if (updateError) throw updateError;
+      if (contract.file_type === 'application/pdf') {
+        content = await extractPdfText(urlData.signedUrl);
+      } else {
+        const response = await fetch(urlData.signedUrl);
+        content = await response.text();
+      }
 
-          // Create review
-          const { error: reviewError } = await supabase
-            .from('contract_reviews')
-            .insert({
-              contract_id: contractId,
-              summary: 'Contract review completed successfully.',
-              risk_level: 'low',
-              recommendations: ['No major issues found', 'Ready for signing']
-            });
+      const review = await reviewDocument(content);
+      setReviewContent(review);
 
-          if (reviewError) throw reviewError;
+      const { error: updateError } = await supabase
+        .from('contracts')
+        .update({ status: 'completed' })
+        .eq('id', contract.id);
 
-          toast.success('Contract review completed');
-          fetchContracts();
-        } catch (error: any) {
-          toast.error('Failed to complete review');
-          console.error('Error:', error);
-        }
-      }, 5000); // Simulate 5-second review process
+      if (updateError) throw updateError;
+
+      const { error: reviewError } = await supabase
+        .from('contract_reviews')
+        .insert({
+          contract_id: contract.id,
+          content: review,
+          created_at: new Date().toISOString()
+        });
+
+      if (reviewError) throw reviewError;
 
       fetchContracts();
     } catch (error: any) {
-      toast.error('Failed to start review');
+      toast.error('Failed to review document');
       console.error('Error:', error);
+    } finally {
+      setReviewing(false);
     }
   };
 
@@ -273,15 +304,25 @@ export default function ContractsPage() {
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={contract.status !== 'pending'}
-                    onClick={() => handleReview(contract.id)}
-                  >
-                    {contract.status === 'pending' ? 'Review' : 
-                     contract.status === 'in_review' ? 'Processing...' : 'View Report'}
-                  </Button>
+                  {contract.status === 'completed' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleReview(contract)}
+                    >
+                      <Info className="h-4 w-4 mr-2" />
+                      View Report
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={contract.status !== 'pending'}
+                      onClick={() => handleReview(contract)}
+                    >
+                      {contract.status === 'pending' ? 'Review' : 'Processing...'}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))
@@ -289,6 +330,7 @@ export default function ContractsPage() {
         </div>
       </Card>
 
+      {/* Preview Modal */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-4xl h-[80vh]">
           <DialogHeader>
@@ -303,6 +345,42 @@ export default function ContractsPage() {
               />
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Review Modal */}
+      <Dialog open={showReview} onOpenChange={setShowReview}>
+        <DialogContent className="max-w-4xl h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>
+              Document Review Report - {selectedContract?.file_name}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-full mt-4 rounded-md border p-4">
+            {reviewing ? (
+              <div className="flex items-center justify-center h-full">
+                <motion.div
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    rotate: [0, 180, 360],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "linear"
+                  }}
+                  className="text-primary"
+                >
+                  <FileText className="h-8 w-8" />
+                </motion.div>
+                <p className="ml-2">Analyzing document...</p>
+              </div>
+            ) : (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown>{reviewContent}</ReactMarkdown>
+              </div>
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
