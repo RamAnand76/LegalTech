@@ -71,7 +71,7 @@ export async function generateLegalDocument(prompt: string): Promise<string> {
 
 export async function reviewDocument(content: string): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const chat = model.startChat({
       history: [
         {

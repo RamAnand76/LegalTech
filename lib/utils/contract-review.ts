@@ -59,22 +59,32 @@ export async function processContractReview(contract: Contract): Promise<string>
     // Create sections for the review
     const sections = [
       "# Contract Review Summary\n\n",
-      "## Key Terms and Definitions\n" + review + "\n\n",
-      "## Obligations and Responsibilities\n" + review + "\n\n",
-      "## Risk Assessment\n" + review + "\n\n",
-      "## Recommendations\n" + review + "\n\n"
-    ].join('');
+      "## Key Terms and Definitions\n" + review.split('Key Findings')[1]?.split('Risk Assessment')[0] || '',
+      "## Risk Assessment\n" + review.split('Risk Assessment')[1]?.split('Recommendations')[0] || '',
+      "## Recommendations\n" + review.split('Recommendations')[1]?.split('Detailed Analysis')[0] || '',
+      "## Detailed Analysis\n" + review.split('Detailed Analysis')[1] || '',
+    ].join('\n\n');
 
-    // Update contract status and store review in a transaction-like manner
-    const { error: reviewError } = await supabase
+    // First update the contract review
+    const { error: insertError } = await supabase
       .from('contract_reviews')
       .insert({
         contract_id: contract.id,
-        review_content: sections,
+        content: sections,  // using 'content' instead of 'review_content'
         created_at: new Date().toISOString()
       });
 
-    return review;
+    if (insertError) throw insertError;
+
+    // Then update the contract status
+    const { error: updateError } = await supabase
+      .from('contracts')
+      .update({ status: 'completed' })
+      .eq('id', contract.id);
+
+    if (updateError) throw updateError;
+
+    return sections;
   } catch (error) {
     // If anything fails, revert status to pending
     await supabase

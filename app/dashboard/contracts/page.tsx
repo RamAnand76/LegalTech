@@ -151,10 +151,10 @@ export default function ContractsPage() {
     setReviewContent(''); // Clear previous review content
 
     try {
-      // Check if review already exists with proper query
+      // Check if review already exists
       const { data: existingReview, error: reviewError } = await supabase
         .from('contract_reviews')
-        .select('review_content')  // Changed from 'content' to 'review_content'
+        .select('content')  // changed from 'review_content' to 'content'
         .eq('contract_id', contract.id)
         .limit(1)
         .single();
@@ -164,7 +164,7 @@ export default function ContractsPage() {
       }
 
       if (existingReview) {
-        setReviewContent(existingReview.review_content);  // Changed from 'content' to 'review_content'
+        setReviewContent(existingReview.content);  // changed from 'review_content' to 'content'
       } else {
         const review = await processContractReview(contract);
         setReviewContent(review);
