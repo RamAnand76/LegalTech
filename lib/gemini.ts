@@ -44,7 +44,7 @@ Use markdown formatting for better readability.`;
 
 export async function generateLegalDocument(prompt: string): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const chat = model.startChat({
       history: [
         {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, Shield, UserCog, LogOut, Settings, Bell, Menu, Newspaper, User, Palette, HelpCircle, Info } from 'lucide-react';
+import { FileText, Shield, UserCog, LogOut, Settings, Bell, Menu, Newspaper } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -34,16 +34,16 @@ export default function DashboardLayout({
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors",
-              isActive 
-                ? "bg-primary text-primary-foreground" 
+              "flex items-center px-3 py-2 rounded-lg transition-colors relative",
+              isActive
+                ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-accent"
             )}
           >
             <item.icon className="h-5 w-5 flex-shrink-0" />
             <span className={cn(
-              "transition-all duration-200",
-              isCollapsed ? "lg:opacity-0 lg:w-0" : "opacity-100"
+              "ml-3 transition-all duration-300 overflow-hidden",
+              isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
             )}>
               {item.label}
             </span>
@@ -112,8 +112,8 @@ export default function DashboardLayout({
       <div className="flex h-screen pt-16">
         {/* Desktop Sidebar */}
         <aside className={cn(
-          "hidden lg:block border-r bg-card fixed h-full transition-all duration-300",
-          isCollapsed ? "w-16" : "w-64"
+          "hidden lg:block border-r bg-card fixed h-full transition-all duration-300 overflow-hidden",
+          isCollapsed ? "w-[4.5rem]" : "w-64"
         )}>
           <SidebarContent />
         </aside>

@@ -22,14 +22,10 @@ import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 import { Contract, ContractStatus } from '@/lib/types/contracts';
 import { toast } from 'sonner';
-import { reviewDocument } from '@/lib/gemini';
 import ReactMarkdown from 'react-markdown';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion } from 'framer-motion';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Initialize PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+import { processContractReview } from '@/lib/utils/contract-review';
 
 export default function ContractsPage() {
   const { user } = useAuth();
@@ -143,71 +139,40 @@ export default function ContractsPage() {
     }
   };
 
-  const extractPdfText = async (url: string): Promise<string> => {
-    try {
-      const pdf = await pdfjsLib.getDocument(url).promise;
-      let fullText = '';
-      
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ');
-        fullText += pageText + '\n\n';
-      }
-      
-      return fullText;
-    } catch (error) {
-      console.error('Error extracting PDF text:', error);
-      throw new Error('Failed to extract text from PDF');
-    }
-  };
-
   const handleReview = async (contract: Contract) => {
+    if (contract.status === 'in_review') {
+      toast.error('Contract is already being reviewed');
+      return;
+    }
+
     setReviewing(true);
     setSelectedContract(contract);
     setShowReview(true);
+    setReviewContent(''); // Clear previous review content
 
     try {
-      const { data: urlData, error: urlError } = await supabase.storage
-        .from('contracts')
-        .createSignedUrl(contract.file_path, 60);
+      // Check if review already exists with proper query
+      const { data: existingReview, error: reviewError } = await supabase
+        .from('contract_reviews')
+        .select('review_content')  // Changed from 'content' to 'review_content'
+        .eq('contract_id', contract.id)
+        .limit(1)
+        .single();
 
-      if (urlError) throw urlError;
-
-      let content = '';
-
-      if (contract.file_type === 'application/pdf') {
-        content = await extractPdfText(urlData.signedUrl);
-      } else {
-        const response = await fetch(urlData.signedUrl);
-        content = await response.text();
+      if (reviewError && reviewError.code !== 'PGRST116') {
+        throw reviewError;
       }
 
-      const review = await reviewDocument(content);
-      setReviewContent(review);
-
-      const { error: updateError } = await supabase
-        .from('contracts')
-        .update({ status: 'completed' })
-        .eq('id', contract.id);
-
-      if (updateError) throw updateError;
-
-      const { error: reviewError } = await supabase
-        .from('contract_reviews')
-        .insert({
-          contract_id: contract.id,
-          content: review,
-          created_at: new Date().toISOString()
-        });
-
-      if (reviewError) throw reviewError;
-
-      fetchContracts();
+      if (existingReview) {
+        setReviewContent(existingReview.review_content);  // Changed from 'content' to 'review_content'
+      } else {
+        const review = await processContractReview(contract);
+        setReviewContent(review);
+      }
+      
+      await fetchContracts();
     } catch (error: any) {
-      toast.error('Failed to review document');
+      toast.error('Failed to review document: ' + error.message);
       console.error('Error:', error);
     } finally {
       setReviewing(false);
@@ -332,10 +297,13 @@ export default function ContractsPage() {
 
       {/* Preview Modal */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-4xl h-[80vh]">
+        <DialogContent className="max-w-4xl h-[80vh]" aria-describedby="preview-description">
           <DialogHeader>
             <DialogTitle>{selectedContract?.file_name}</DialogTitle>
           </DialogHeader>
+          <p id="preview-description" className="sr-only">
+            Preview of contract document {selectedContract?.file_name}
+          </p>
           {previewUrl && (
             <div className="flex-1 w-full h-full min-h-[60vh]">
               <iframe
@@ -350,12 +318,15 @@ export default function ContractsPage() {
 
       {/* Review Modal */}
       <Dialog open={showReview} onOpenChange={setShowReview}>
-        <DialogContent className="max-w-4xl h-[80vh]">
+        <DialogContent className="max-w-4xl h-[80vh]" aria-describedby="review-description">
           <DialogHeader>
             <DialogTitle>
-              Document Review Report - {selectedContract?.file_name}
+              Contract Analysis Report - {selectedContract?.file_name}
             </DialogTitle>
           </DialogHeader>
+          <p id="review-description" className="sr-only">
+            AI-generated analysis of contract {selectedContract?.file_name}
+          </p>
           <ScrollArea className="h-full mt-4 rounded-md border p-4">
             {reviewing ? (
               <div className="flex items-center justify-center h-full">
@@ -376,7 +347,7 @@ export default function ContractsPage() {
                 <p className="ml-2">Analyzing document...</p>
               </div>
             ) : (
-              <div className="prose prose-sm max-w-none dark:prose-invert">
+              <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-primary">
                 <ReactMarkdown>{reviewContent}</ReactMarkdown>
               </div>
             )}
