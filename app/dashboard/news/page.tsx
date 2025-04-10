@@ -1,93 +1,136 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { motion } from 'framer-motion';
+import InfiniteScroll from 'react-infinite-scroll-component';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Newspaper, BookOpen, ExternalLink } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { fetchLegalNews } from '@/lib/news-api';
+import { NewsArticle } from '@/lib/types/news';
+import { Globe, ExternalLink, Calendar, Building2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+const countries = [
+  { code: 'us', name: 'United States' },
+  { code: 'gb', name: 'United Kingdom' },
+  { code: 'in', name: 'India' },
+  { code: 'ca', name: 'Canada' },
+  { code: 'au', name: 'Australia' },
+];
 
 export default function NewsPage() {
-  const [news] = useState([
-    {
-      id: 1,
-      title: 'Supreme Court Issues New Guidelines on Digital Evidence',
-      category: 'Legal Updates',
-      summary: 'New framework for handling digital evidence in court proceedings...',
-      source: 'Legal Times',
-      date: '2024-03-20',
-      readTime: '5 min read',
-    },
-    {
-      id: 2,
-      title: 'Major Changes in Corporate Law Coming in 2024',
-      category: 'Corporate Law',
-      summary: 'Upcoming amendments to the Companies Act that will affect businesses...',
-      source: 'Business Law Review',
-      date: '2024-03-19',
-      readTime: '8 min read',
-    },
-    {
-      id: 3,
-      title: 'New Data Protection Regulations Announced',
-      category: 'Privacy Law',
-      summary: 'Government announces stricter data protection measures...',
-      source: 'Tech Law Journal',
-      date: '2024-03-18',
-      readTime: '6 min read',
-    },
-  ]);
+  const [country, setCountry] = useState('us');
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['legal-news', country, page],
+    queryFn: () => fetchLegalNews({ country, page }),
+    keepPreviousData: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const loadMore = () => {
+    setPage((prev) => prev + 1);
+  };
+
+  if (isError) {
+    toast.error('Failed to load news articles');
+    console.error('Error:', error);
+  }
 
   return (
-    <div>
+    <div className="min-h-screen">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Legal News</h1>
-        <div className="flex gap-4">
-          <Button variant="outline">
-            Filter by Category
-          </Button>
-          <Button>
-            Subscribe to Updates
-          </Button>
+        <div className="flex items-center gap-4">
+          <Globe className="h-5 w-5 text-muted-foreground" />
+          <Select value={country} onValueChange={setCountry}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select country" />
+            </SelectTrigger>
+            <SelectContent>
+              {countries.map((country) => (
+                <SelectItem key={country.code} value={country.code}>
+                  {country.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {news.map((item) => (
-          <Card key={item.id} className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-2">
-                  <span className="text-sm font-medium px-2 py-1 rounded-full bg-secondary">
-                    {item.category}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {item.date}
-                  </span>
-                  <span className="text-sm text-muted-foreground flex items-center">
-                    <BookOpen className="h-4 w-4 mr-1" />
-                    {item.readTime}
-                  </span>
-                </div>
-                <h2 className="text-xl font-semibold mb-2">{item.title}</h2>
-                <p className="text-muted-foreground mb-4">{item.summary}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Source: {item.source}
-                  </span>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      <BookOpen className="h-4 w-4 mr-2" />
-                      Read More
-                    </Button>
-                    <Button variant="ghost" size="icon">
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
+      {isLoading ? (
+        <div className="space-y-6">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="p-6">
+              <div className="space-y-4">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <InfiniteScroll
+          dataLength={data?.articles.length || 0}
+          next={loadMore}
+          hasMore={(data?.totalArticles || 0) > (data?.articles.length || 0)}
+          loader={<div className="text-center py-4">Loading more articles...</div>}
+          className="space-y-6"
+        >
+          {data?.articles.map((article: NewsArticle, index: number) => (
+            <motion.div
+              key={`${article.url}-${index}`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Card className="p-6 hover:bg-accent/50 transition-colors">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {article.image && (
+                    <div className="md:col-span-1">
+                      <img
+                        src={article.image}
+                        alt={article.title}
+                        className="w-full h-48 object-cover rounded-lg"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop';
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div className={`${article.image ? 'md:col-span-2' : 'md:col-span-3'}`}>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                      <Building2 className="h-4 w-4" />
+                      <span>{article.source.name}</span>
+                      <span>•</span>
+                      <Calendar className="h-4 w-4" />
+                      <span>{format(new Date(article.publishedAt), 'MMM d, yyyy')}</span>
+                    </div>
+                    
+                    <h2 className="text-xl font-semibold mb-3">{article.title}</h2>
+                    <p className="text-muted-foreground mb-4">{article.description}</p>
+                    
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-primary hover:text-primary/90"
+                    >
+                      Read full article
+                      <ExternalLink className="ml-2 h-4 w-4" />
+                    </a>
                   </div>
                 </div>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+              </Card>
+            </motion.div>
+          ))}
+        </InfiniteScroll>
+      )}
     </div>
   );
 }
