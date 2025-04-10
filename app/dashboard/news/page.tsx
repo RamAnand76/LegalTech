@@ -28,8 +28,8 @@ export default function NewsPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['legal-news', country, page],
     queryFn: () => fetchLegalNews({ country, page }),
-    keepPreviousData: true,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    placeholderData: (previousData) => previousData, // Replaces keepPreviousData
   });
 
   const loadMore = () => {
@@ -62,7 +62,7 @@ export default function NewsPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isLoading && !data ? ( // Show skeletons only on initial load
         <div className="space-y-6">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="p-6">
