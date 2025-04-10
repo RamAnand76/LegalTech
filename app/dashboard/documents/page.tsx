@@ -109,11 +109,11 @@ export default function DocumentsPage() {
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string,
-    field?: string
+    field?: keyof DocumentFormData
   ) => {
     if (typeof e === 'string' && field) {
       setFormData((prev) => ({ ...prev, [field]: e }));
-    } else if ('target' in e) {
+    } else if (typeof e !== 'string' && 'target' in e) {
       const { name, value } = e.target;
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
