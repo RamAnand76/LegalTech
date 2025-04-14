@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const sidebarItems = [
   { icon: FileText, label: 'Contract Review', href: '/dashboard/contracts' },
@@ -90,6 +91,7 @@ export default function DashboardLayout({
               </Link>
             </div>
             <div className="flex items-center space-x-4">
+              <ThemeToggle />
               <Link href="/dashboard/notifications">
                 <Button variant="ghost" size="icon">
                   <Bell className="h-5 w-5" />

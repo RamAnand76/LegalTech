@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,9 @@ interface PartyDetails {
   address: string;
   email: string;
   phone: string;
+  company?: string;
+  designation?: string;
+  idNumber?: string;
 }
 
 interface DocumentFormData {
@@ -36,6 +40,10 @@ interface DocumentFormData {
   party2: PartyDetails;
   effectiveDate: string;
   jurisdiction: string;
+  governingLaw?: string;
+  disputeResolution?: string;
+  confidentiality?: boolean;
+  termination?: string;
 }
 
 const initialPartyDetails: PartyDetails = {
@@ -44,6 +52,9 @@ const initialPartyDetails: PartyDetails = {
   address: '',
   email: '',
   phone: '',
+  company: '',
+  designation: '',
+  idNumber: '',
 };
 
 const initialFormData: DocumentFormData = {
@@ -55,12 +66,17 @@ const initialFormData: DocumentFormData = {
   party2: { ...initialPartyDetails },
   effectiveDate: new Date().toISOString().split('T')[0],
   jurisdiction: '',
+  governingLaw: '',
+  disputeResolution: '',
+  confidentiality: true,
+  termination: '30 days',
 };
 
 export default function DocumentsPage() {
   const [showNewDocModal, setShowNewDocModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [formData, setFormData] = useState<DocumentFormData>(initialFormData);
   const [generatedContent, setGeneratedContent] = useState<string>('');
   const [documents, setDocuments] = useState<Array<{ title: string; description: string; content: string }>>([]);
@@ -84,42 +100,29 @@ export default function DocumentsPage() {
     }
   };
 
-  const generatePrompt = () => {
-    return `
-Generate a ${formData.documentType} with the following details:
-
-Document Title: ${formData.title}
-Description: ${formData.description}
-
-Party 1 Details:
-- Name: ${formData.party1.name}
-- Age: ${formData.party1.age}
-- Address: ${formData.party1.address}
-- Email: ${formData.party1.email}
-- Phone: ${formData.party1.phone}
-
-Party 2 Details:
-- Name: ${formData.party2.name}
-- Age: ${formData.party2.age}
-- Address: ${formData.party2.address}
-- Email: ${formData.party2.email}
-- Phone: ${formData.party2.phone}
-
-Effective Date: ${formData.effectiveDate}
-Jurisdiction: ${formData.jurisdiction}
-
-Additional Requirements:
-${formData.prompt}
-`;
+  const simulateProgress = () => {
+    setProgress(0);
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 5;
+      });
+    }, 500);
+    return interval;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!formData.title || !formData.documentType || !formData.party1.name || !formData.party2.name) {
       toast.error('Please fill in all required fields');
       return;
     }
 
     setGenerating(true);
+    const progressInterval = simulateProgress();
 
     try {
       const prompt = generatePrompt();
@@ -138,8 +141,52 @@ ${formData.prompt}
       toast.error(error.message || 'Failed to generate document');
       console.error('Error:', error);
     } finally {
-      setGenerating(false);
+      clearInterval(progressInterval);
+      setProgress(100);
+      setTimeout(() => {
+        setGenerating(false);
+        setProgress(0);
+      }, 500);
     }
+  };
+
+  const generatePrompt = () => {
+    return `
+Generate a ${formData.documentType} with the following details:
+
+Document Title: ${formData.title}
+Description: ${formData.description}
+
+Party 1 Details:
+- Name: ${formData.party1.name}
+- Age: ${formData.party1.age}
+- Address: ${formData.party1.address}
+- Email: ${formData.party1.email}
+- Phone: ${formData.party1.phone}
+- Company: ${formData.party1.company}
+- Designation: ${formData.party1.designation}
+- ID Number: ${formData.party1.idNumber}
+
+Party 2 Details:
+- Name: ${formData.party2.name}
+- Age: ${formData.party2.age}
+- Address: ${formData.party2.address}
+- Email: ${formData.party2.email}
+- Phone: ${formData.party2.phone}
+- Company: ${formData.party2.company}
+- Designation: ${formData.party2.designation}
+- ID Number: ${formData.party2.idNumber}
+
+Effective Date: ${formData.effectiveDate}
+Jurisdiction: ${formData.jurisdiction}
+Governing Law: ${formData.governingLaw}
+Dispute Resolution: ${formData.disputeResolution}
+Confidentiality: ${formData.confidentiality ? 'Required' : 'Not Required'}
+Termination Notice: ${formData.termination}
+
+Additional Requirements:
+${formData.prompt}
+`;
   };
 
   const PartyForm = ({ party, label }: { party: 'party1' | 'party2', label: string }) => (
@@ -170,6 +217,24 @@ ${formData.prompt}
           name="phone"
           placeholder="Phone"
           value={formData[party].phone}
+          onChange={(e) => handleInputChange(e, party)}
+        />
+        <Input
+          name="company"
+          placeholder="Company Name"
+          value={formData[party].company}
+          onChange={(e) => handleInputChange(e, party)}
+        />
+        <Input
+          name="designation"
+          placeholder="Designation"
+          value={formData[party].designation}
+          onChange={(e) => handleInputChange(e, party)}
+        />
+        <Input
+          name="idNumber"
+          placeholder="ID Number"
+          value={formData[party].idNumber}
           onChange={(e) => handleInputChange(e, party)}
         />
         <div className="col-span-2">
@@ -297,6 +362,24 @@ ${formData.prompt}
                   value={formData.jurisdiction}
                   onChange={handleInputChange}
                 />
+                <Input
+                  name="governingLaw"
+                  placeholder="Governing Law"
+                  value={formData.governingLaw}
+                  onChange={handleInputChange}
+                />
+                <Input
+                  name="disputeResolution"
+                  placeholder="Dispute Resolution Method"
+                  value={formData.disputeResolution}
+                  onChange={handleInputChange}
+                />
+                <Input
+                  name="termination"
+                  placeholder="Termination Notice Period"
+                  value={formData.termination}
+                  onChange={handleInputChange}
+                />
               </div>
               
               <PartyForm party="party1" label="Party 1 Details" />
@@ -315,6 +398,14 @@ ${formData.prompt}
           </ScrollArea>
 
           <div className="border-t pt-4 mt-4">
+            {generating && (
+              <div className="mb-4">
+                <Progress value={progress} className="h-2" />
+                <p className="text-sm text-muted-foreground mt-2 text-center">
+                  Generating document... {progress}%
+                </p>
+              </div>
+            )}
             <DialogFooter>
               <Button
                 variant="outline"
@@ -336,12 +427,6 @@ ${formData.prompt}
                       ease: "linear"
                     }}
                     className="mr-2"
-                    style={{
-                      background: "linear-gradient(45deg, #FFD700, #FFA500)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      filter: "drop-shadow(0 0 2px rgba(255, 215, 0, 0.5))"
-                    }}
                   >
                     <Sparkles className="h-4 w-4" />
                   </motion.div>
